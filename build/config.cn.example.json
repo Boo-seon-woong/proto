@@ -1,0 +1,23 @@
+{
+  "role": "cn",
+  "require_tdx": false,
+  "cn": {
+    "client_id": "cn-1",
+    "encryption_key_hex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+    "replication_factor": 2,
+    "populate_cache_on_read_miss": true,
+    "max_retries": 16,
+    "mn_endpoints": [
+      {
+        "node_id": "mn-1",
+        "host": "127.0.0.1",
+        "port": 7001
+      },
+      {
+        "node_id": "mn-2",
+        "host": "127.0.0.1",
+        "port": 7002
+      }
+    ]
+  }
+}

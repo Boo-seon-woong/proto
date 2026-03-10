@@ -1,0 +1,11 @@
+{
+  "role": "mn",
+  "require_tdx": true,
+  "mn": {
+    "node_id": "mn-1",
+    "listen_host": "127.0.0.1",
+    "listen_port": 7001,
+    "cache_capacity": 1024,
+    "state_dir": "state/mn-1"
+  }
+}
