@@ -42,6 +42,9 @@ def parse_mn_config(raw: Dict[str, Any], config_dir: str, root_require_tdx: bool
     else:
         state_dir = os.path.abspath(os.path.join(config_dir, state_dir_raw))
 
+    rdma_listen_host = raw.get("rdma_listen_host")
+    rdma_listen_port = raw.get("rdma_listen_port")
+
     return MNNodeConfig(
         node_id=str(raw["node_id"]),
         listen_host=str(raw["listen_host"]),
@@ -49,6 +52,10 @@ def parse_mn_config(raw: Dict[str, Any], config_dir: str, root_require_tdx: bool
         cache_capacity=int(raw["cache_capacity"]),
         state_dir=state_dir,
         require_tdx=bool(raw.get("require_tdx", root_require_tdx)),
+        enable_rdma_server=bool(raw.get("enable_rdma_server", False)),
+        rdma_listen_host=str(rdma_listen_host) if rdma_listen_host is not None else None,
+        rdma_listen_port=int(rdma_listen_port) if rdma_listen_port is not None else None,
+        require_rdma_server=bool(raw.get("require_rdma_server", False)),
     )
 
 
@@ -61,6 +68,7 @@ def parse_cn_config(raw: Dict[str, Any], root_require_tdx: bool) -> CNConfig:
             node_id=str(item["node_id"]),
             host=str(item["host"]),
             port=int(item["port"]),
+            rdma_port=int(item["rdma_port"]) if item.get("rdma_port") is not None else None,
         )
         for item in endpoints_raw
     ]
@@ -73,4 +81,5 @@ def parse_cn_config(raw: Dict[str, Any], root_require_tdx: bool) -> CNConfig:
         populate_cache_on_read_miss=bool(raw.get("populate_cache_on_read_miss", True)),
         max_retries=int(raw.get("max_retries", 8)),
         require_tdx=bool(raw.get("require_tdx", root_require_tdx)),
+        cache_path_transport=str(raw.get("cache_path_transport", "auto")),
     )

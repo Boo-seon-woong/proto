@@ -12,8 +12,8 @@
 - Authoritative pointer: `CachePrimeTable[key] = (addr, epoch)`
 
 주요 경로:
-- Fast path: cache hit 시 CN이 RDMA 스타일 RPC + CAS로 완료
-- Miss path: prime 미존재 시 MN CPU private fetch 후 cache 재삽입
+- Fast path: cache hit 시 CN이 RDMA cache path로 prime/slot/CAS 처리
+- Miss path: prime 미존재 시 TCP control path로 MN CPU private fetch 후 cache 재삽입
 - Snapshot read: `prime1 -> slot -> prime2` 더블체크
 - Eviction: prime 기반 victim 선택, private flush 후 prime 제거
 
@@ -58,6 +58,17 @@ TDX 강제 실행:
 - 현재 `build/config.mn.example.json`, `build/config.mn2.example.json`, `build/config.json`은 `require_tdx: true`
 - 로컬 개발/디버깅 시에는 `require_tdx: false` 로 바꿔 실행
 
+전송 경로 분리:
+
+- MN `listen_*`: TCP control path
+- MN `rdma_listen_*`: RDMA cache path
+- CN endpoint `port`: TCP control path
+- CN endpoint `rdma_port`: RDMA cache path
+- CN `cache_path_transport`
+  - `rdma`: cache path는 RDMA만 허용
+  - `auto`: RDMA 실패 시 TCP fallback
+- RDMA 설정 시 `rdma_listen_host`/`mn_endpoints.host`에 loopback(`127.0.0.1`) 대신 RDMA NIC의 실제 IP를 사용
+
 ## 5) 실행 시나리오 A (TDX 게스트 내부)
 
 ### 5.1 MN 실행
@@ -73,6 +84,10 @@ python3 -m kvs --config build/config.mn.example.json serve
 ```bash
 python3 -m kvs --config build/config.mn2.example.json serve
 ```
+
+방화벽에서 아래 포트를 열어야 합니다.
+- TCP control path: 7001, 7002
+- RDMA cache path: 7101, 7102
 
 ### 5.2 CN 명령 실행
 

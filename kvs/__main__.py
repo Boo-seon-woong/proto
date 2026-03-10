@@ -91,7 +91,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command not in {None, "serve"}:
             raise SystemExit("MN role only supports: serve")
         node = MNNode(config)  # type: ignore[arg-type]
-        print(f"MN node {node.config.node_id} listening on {node.config.listen_host}:{node.config.listen_port}")
+        print(f"MN node {node.config.node_id} control(TCP) listening on {node.config.listen_host}:{node.config.listen_port}")
+        if node.config.enable_rdma_server:
+            rdma_host = node.config.rdma_listen_host or node.config.listen_host
+            rdma_port = node.config.rdma_listen_port or (node.config.listen_port + 100)
+            print(f"MN node {node.config.node_id} cache-path(RDMA) listening on {rdma_host}:{rdma_port}")
         node.serve_forever()
         return 0
 

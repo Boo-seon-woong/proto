@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 from kvs.models import CacheSlot, CipherRecord, PrimeEntry
+from kvs.rdma_rpc import RDMARPCServer, rdma_supported
 
 
 @dataclass
@@ -19,9 +20,21 @@ class MNNodeConfig:
     cache_capacity: int
     state_dir: str
     require_tdx: bool = False
+    enable_rdma_server: bool = False
+    rdma_listen_host: Optional[str] = None
+    rdma_listen_port: Optional[int] = None
+    require_rdma_server: bool = False
 
 
 class MNNode:
+    RDMA_ACTIONS = {
+        "rdma_alloc_slot",
+        "rdma_write_slot",
+        "rdma_read_slot",
+        "rdma_read_prime",
+        "rdma_cas_prime",
+    }
+
     def __init__(self, config: MNNodeConfig):
         if config.cache_capacity <= 0:
             raise ValueError("cache_capacity must be > 0")
@@ -180,6 +193,12 @@ class MNNode:
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
+    def handle_rdma_rpc(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        action = request.get("action")
+        if action not in self.RDMA_ACTIONS:
+            return {"ok": False, "error": f"unsupported rdma action: {action}"}
+        return self.handle_rpc(request)
+
     def _rpc_rdma_alloc_slot(self) -> Dict[str, Any]:
         with self._lock:
             slot_id, epoch = self._allocate_slot_locked()
@@ -303,9 +322,36 @@ class MNNode:
         server.node = self
         return server
 
+    def build_rdma_server(self) -> Optional[RDMARPCServer]:
+        if not self.config.enable_rdma_server:
+            return None
+        if not rdma_supported():
+            if self.config.require_rdma_server:
+                raise RuntimeError("RDMA server requested but rdma transport is unavailable on this host")
+            return None
+
+        host = self.config.rdma_listen_host or self.config.listen_host
+        port = self.config.rdma_listen_port
+        if port is None:
+            port = self.config.listen_port + 100
+        return RDMARPCServer(host=host, port=port, handler=self.handle_rdma_rpc)
+
     def serve_forever(self) -> None:
+        rdma_server = self.build_rdma_server()
         with self.build_server() as server:
-            server.serve_forever()
+            if rdma_server is None:
+                server.serve_forever()
+                return
+
+            tcp_thread = threading.Thread(target=server.serve_forever, daemon=True)
+            tcp_thread.start()
+            try:
+                rdma_server.serve_forever()
+            finally:
+                server.shutdown()
+                server.server_close()
+                tcp_thread.join(timeout=1.0)
+                rdma_server.close()
 
 
 class RPCHandler(socketserver.StreamRequestHandler):

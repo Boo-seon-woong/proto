@@ -11,6 +11,7 @@ class Endpoint:
     node_id: str
     host: str
     port: int
+    rdma_port: Optional[int] = None
 
 
 class RPCError(RuntimeError):

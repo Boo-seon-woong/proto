@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from kvs.crypto import AEADCipher, key_from_hex
 from kvs.models import CacheSlot, CipherRecord, PrimeEntry
+from kvs.rdma_rpc import RDMAEndpoint, RDMAError, rdma_call
 from kvs.rpc import Endpoint, rpc_call
 
 TOMBSTONE_MARKER = b"__TDX_KVS_TOMBSTONE__"
@@ -20,6 +21,7 @@ class CNConfig:
     populate_cache_on_read_miss: bool = True
     max_retries: int = 8
     require_tdx: bool = False
+    cache_path_transport: str = "auto"
 
 
 class CNNode:
@@ -31,6 +33,29 @@ class CNNode:
 
         self.config = config
         self._cipher = AEADCipher(key_from_hex(config.encryption_key_hex))
+
+    def _cache_rpc_call(self, endpoint: Endpoint, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        mode = self.config.cache_path_transport.lower()
+        if mode not in {"auto", "tcp", "rdma"}:
+            raise ValueError("cache_path_transport must be one of: auto, tcp, rdma")
+
+        should_try_rdma = mode == "rdma" or (mode == "auto" and endpoint.rdma_port is not None)
+        if should_try_rdma:
+            if endpoint.rdma_port is None:
+                raise RuntimeError(f"{endpoint.node_id} has no rdma_port configured")
+            rdma_endpoint = RDMAEndpoint(
+                node_id=endpoint.node_id,
+                host=endpoint.host,
+                port=endpoint.rdma_port,
+            )
+            try:
+                return rdma_call(rdma_endpoint, action, params)
+            except RDMAError:
+                if mode == "rdma":
+                    raise
+                return rpc_call(endpoint, action, params)
+
+        return rpc_call(endpoint, action, params)
 
     def _stable_hash(self, key: str) -> int:
         digest = hashlib.sha256(key.encode("utf-8")).digest()
@@ -67,7 +92,7 @@ class CNNode:
 
     def _commit_to_replica(self, endpoint: Endpoint, key: str, record: CipherRecord) -> None:
         for _ in range(self.config.max_retries):
-            prime_result = rpc_call(endpoint, "rdma_read_prime", {"key": key})["result"]
+            prime_result = self._cache_rpc_call(endpoint, "rdma_read_prime", {"key": key})["result"]
             expected_addr: Optional[int] = None
             expected_epoch: Optional[int] = None
             private_addr: Optional[int] = None
@@ -82,11 +107,11 @@ class CNNode:
                 if private_result.get("found"):
                     private_addr = int(private_result["private_addr"])
 
-            alloc_result = rpc_call(endpoint, "rdma_alloc_slot")["result"]
+            alloc_result = self._cache_rpc_call(endpoint, "rdma_alloc_slot", {})["result"]
             slot_id = int(alloc_result["slot_id"])
             slot_epoch = int(alloc_result["epoch"])
 
-            write_result = rpc_call(
+            write_result = self._cache_rpc_call(
                 endpoint,
                 "rdma_write_slot",
                 {
@@ -98,7 +123,7 @@ class CNNode:
             if not write_result.get("write_ok", False):
                 continue
 
-            cas_result = rpc_call(
+            cas_result = self._cache_rpc_call(
                 endpoint,
                 "rdma_cas_prime",
                 {
@@ -117,7 +142,7 @@ class CNNode:
     def read(self, key: str) -> Optional[str]:
         primary = self._select_replicas(key)[0]
         for _ in range(self.config.max_retries):
-            prime1_result = rpc_call(primary, "rdma_read_prime", {"key": key})["result"]
+            prime1_result = self._cache_rpc_call(primary, "rdma_read_prime", {"key": key})["result"]
 
             if not prime1_result.get("found"):
                 private_result = rpc_call(primary, "cpu_fetch_private", {"key": key})["result"]
@@ -135,8 +160,8 @@ class CNNode:
                 return plaintext.decode("utf-8")
 
             prime1 = PrimeEntry.from_dict(prime1_result["entry"])
-            slot_result = rpc_call(primary, "rdma_read_slot", {"slot_id": prime1.addr})["result"]
-            prime2_result = rpc_call(primary, "rdma_read_prime", {"key": key})["result"]
+            slot_result = self._cache_rpc_call(primary, "rdma_read_slot", {"slot_id": prime1.addr})["result"]
+            prime2_result = self._cache_rpc_call(primary, "rdma_read_prime", {"key": key})["result"]
 
             if not prime2_result.get("found"):
                 continue
@@ -167,11 +192,11 @@ class CNNode:
         private_addr: Optional[int],
     ) -> None:
         for _ in range(self.config.max_retries):
-            alloc_result = rpc_call(endpoint, "rdma_alloc_slot")["result"]
+            alloc_result = self._cache_rpc_call(endpoint, "rdma_alloc_slot", {})["result"]
             slot_id = int(alloc_result["slot_id"])
             slot_epoch = int(alloc_result["epoch"])
 
-            write_result = rpc_call(
+            write_result = self._cache_rpc_call(
                 endpoint,
                 "rdma_write_slot",
                 {
@@ -183,7 +208,7 @@ class CNNode:
             if not write_result.get("write_ok", False):
                 continue
 
-            cas_result = rpc_call(
+            cas_result = self._cache_rpc_call(
                 endpoint,
                 "rdma_cas_prime",
                 {
