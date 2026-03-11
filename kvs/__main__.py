@@ -156,9 +156,10 @@ def run_verify_rdma(client: CNNode, probe_key: str) -> int:
 
     all_cache_probes_rdma = True
     for endpoint in client.config.mn_endpoints:
-        report = rdma_host_binding_report(endpoint.host)
+        rdma_host = endpoint.rdma_host or endpoint.host
+        report = rdma_host_binding_report(rdma_host)
         print(
-            f"RDMA host binding: endpoint={endpoint.node_id} host={endpoint.host} "
+            f"RDMA host binding: endpoint={endpoint.node_id} tcp_host={endpoint.host} rdma_host={rdma_host} "
             f"resolved={report.get('resolved_ip')} {_format_rdma_match(report)}"
         )
         try:

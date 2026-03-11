@@ -111,8 +111,8 @@ Shared memory와 private backing 모두 ciphertext만 저장하며, CN만 복호
   - `listen_host/listen_port`: TCP control plane (`cpu_fetch_private` 등)
   - `rdma_listen_host/rdma_listen_port`: RDMA cache path (`rdma_*` 액션)
 - CN endpoint
-  - `port`: TCP control plane 포트
-  - `rdma_port`: RDMA cache path 포트
+  - `host`/`port`: TCP control plane 대상
+  - `rdma_host`/`rdma_port`: RDMA cache path 대상 (`rdma_host` 미설정 시 `host` 사용)
 - CN 정책
   - `cache_path_transport: "rdma"`: RDMA 실패 시 즉시 에러
   - `cache_path_transport: "auto"`: RDMA 실패 시 TCP fallback
@@ -120,5 +120,6 @@ Shared memory와 private backing 모두 ciphertext만 저장하며, CN만 복호
 
 주의:
 - RDMA cache path는 일반적으로 loopback(`127.0.0.1`)에서 동작하지 않습니다.
-- `rdma_listen_host`/`mn_endpoints.host`는 RDMA NIC가 붙은 실제 인터페이스 IP를 사용해야 합니다.
+- `rdma_listen_host`/`mn_endpoints.rdma_host`는 RDMA NIC가 붙은 실제 인터페이스 IP를 사용해야 합니다.
+- TDX VM이 host-forward TCP(`host`) + guest 직접 RDMA(`rdma_host`)를 같이 쓰는 토폴로지라면 `host`와 `rdma_host`를 분리해서 설정해야 합니다.
 - `verify-rdma`가 RDMA probe 성공을 보여도, 현재 구현은 one-sided RDMA CPU-bypass가 아니라 two-sided RPC 모델입니다.

@@ -12,6 +12,7 @@ class Endpoint:
     host: str
     port: int
     rdma_port: Optional[int] = None
+    rdma_host: Optional[str] = None
 
 
 class RPCError(RuntimeError):

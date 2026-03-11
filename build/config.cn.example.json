@@ -13,12 +13,14 @@
       {
         "node_id": "mn-1",
         "host": "10.20.26.87",
+        "rdma_host": "10.20.26.87",
         "port": 7001,
         "rdma_port": 7101
       },
       {
         "node_id": "mn-2",
         "host": "10.20.26.87",
+        "rdma_host": "10.20.26.87",
         "port": 7002,
         "rdma_port": 7102
       }

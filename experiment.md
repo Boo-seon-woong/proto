@@ -64,15 +64,16 @@ TDX 강제 실행:
 
 - MN `listen_*`: TCP control path
 - MN `rdma_listen_*`: RDMA cache path
-- CN endpoint `port`: TCP control path
-- CN endpoint `rdma_port`: RDMA cache path
+- CN endpoint `host`/`port`: TCP control path
+- CN endpoint `rdma_host`/`rdma_port`: RDMA cache path (`rdma_host`가 없으면 `host` 사용)
 - CN `cache_path_transport`
   - `rdma`: cache path는 RDMA만 허용
   - `auto`: RDMA 실패 시 TCP fallback
 - CN `trace_operations`
   - `true`: read/write/update/delete마다 cache hit/miss + transport(RDMA/TCP/fallback) trace 출력
   - `false`: trace 비활성화
-- RDMA 설정 시 `rdma_listen_host`/`mn_endpoints.host`에 loopback(`127.0.0.1`) 대신 RDMA NIC의 실제 IP를 사용
+- RDMA 설정 시 `rdma_listen_host`/`mn_endpoints.rdma_host`에 loopback(`127.0.0.1`) 대신 RDMA NIC의 실제 IP를 사용
+- host-forward TCP와 guest 직접 RDMA를 같이 쓰면 `mn_endpoints.host`(TCP)와 `mn_endpoints.rdma_host`(RDMA)를 분리
 
 ## 5) 실행 시나리오 A (TDX 게스트 내부)
 

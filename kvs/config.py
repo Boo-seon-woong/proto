@@ -69,6 +69,7 @@ def parse_cn_config(raw: Dict[str, Any], root_require_tdx: bool) -> CNConfig:
             host=str(item["host"]),
             port=int(item["port"]),
             rdma_port=int(item["rdma_port"]) if item.get("rdma_port") is not None else None,
+            rdma_host=str(item["rdma_host"]) if item.get("rdma_host") is not None else None,
         )
         for item in endpoints_raw
     ]

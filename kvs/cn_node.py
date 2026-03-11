@@ -63,7 +63,7 @@ class CNNode:
                 raise RuntimeError(f"{endpoint.node_id} has no rdma_port configured")
             rdma_endpoint = RDMAEndpoint(
                 node_id=endpoint.node_id,
-                host=endpoint.host,
+                host=endpoint.rdma_host or endpoint.host,
                 port=endpoint.rdma_port,
             )
             try:

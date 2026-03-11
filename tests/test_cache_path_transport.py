@@ -77,6 +77,31 @@ class CachePathTransportTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "no rdma_port"):
             client._cache_rpc_call(self.endpoint_no_rdma, "rdma_read_prime", {"key": "a"})
 
+    def test_rdma_host_overrides_tcp_host(self) -> None:
+        endpoint = Endpoint(
+            node_id="mn-1",
+            host="10.10.10.10",
+            port=7001,
+            rdma_port=7101,
+            rdma_host="192.168.100.10",
+        )
+        client = CNNode(
+            CNConfig(
+                client_id="cn-1",
+                encryption_key_hex=self.base_key,
+                replication_factor=1,
+                mn_endpoints=[endpoint],
+                cache_path_transport="rdma",
+            )
+        )
+
+        with patch("kvs.cn_node.rdma_call", return_value={"ok": True, "result": {"x": 1}}) as rdma_mock:
+            client._cache_rpc_call(endpoint, "rdma_read_prime", {"key": "a"})
+
+        self.assertEqual(1, rdma_mock.call_count)
+        called_endpoint = rdma_mock.call_args.args[0]
+        self.assertEqual("192.168.100.10", called_endpoint.host)
+
 
 if __name__ == "__main__":
     unittest.main()
